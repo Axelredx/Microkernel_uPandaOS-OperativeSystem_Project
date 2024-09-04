@@ -1,4 +1,4 @@
-# Autori
+# Authors
 
 Alex Rossi alex.rossi7@studio.unibo.it 0001089916
 Diego Barbieri diego.barbieri5@studio.unibo.it 0001080333
