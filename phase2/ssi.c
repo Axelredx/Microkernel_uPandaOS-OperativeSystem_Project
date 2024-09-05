@@ -129,28 +129,28 @@ unsigned Terminate_Process(pcb_t *sender, pcb_t *target) {
 
 void getDevLineAndNumber(unsigned command_address, unsigned *dev_line, unsigned *dev_no){
   for (int j = 0; j < N_DEV_PER_IL; j++) {
-        termreg_t *base_address = (termreg_t *)DEV_REG_ADDR(IL_TERMINAL, j);
-        if (command_address == (memaddr)&(base_address->recv_command)) {
-            *dev_line = IL_TERMINAL;
-            *dev_no = j;
-            return;
-        } else if (command_address == (memaddr)&(base_address->transm_command)) {
-            *dev_line = IL_TERMINAL;
-            *dev_no = j;
-            return;
-        }
+    termreg_t *base_address = (termreg_t *)DEV_REG_ADDR(IL_TERMINAL, j);
+    if (command_address == (memaddr)&(base_address->recv_command)) {
+      *dev_line = IL_TERMINAL;
+      *dev_no = j;
+      return;
+    } else if (command_address == (memaddr)&(base_address->transm_command)) {
+      *dev_line = IL_TERMINAL;
+      *dev_no = j;
+      return;
     }
+  }
 
   for (int i = DEV_IL_START; i < DEV_IL_START + 7; i++) {
-        for (int j = 0; j < N_DEV_PER_IL; j++) {
-            dtpreg_t *base_address = (dtpreg_t *)DEV_REG_ADDR(i, j);
-            if (command_address == (memaddr)&(base_address->command)) {
-                *dev_line = i;
-                *dev_no = j;
-                return;
-            }
-        }
+    for (int j = 0; j < N_DEV_PER_IL; j++) {
+      dtpreg_t *base_address = (dtpreg_t *)DEV_REG_ADDR(i, j);
+      if (command_address == (memaddr)&(base_address->command)) {
+        *dev_line = i;
+        *dev_no = j;
+        return;
+      }
     }
+  }
 }
 
 unsigned DoIO(pcb_t *sender, ssi_do_io_PTR arg) {
