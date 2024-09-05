@@ -1,4 +1,4 @@
-# Microkernel_dev_for_uRISCV_uPandaOS-Operative_System_Project
+# Microkernel_for_uRISCV_uPandaOS-Operative_System_Project
 This repo contains the implementation of three of the seven levels of abstraction of *uPandOS*, for the *uRISCV* architecture, written in C. 
 The  levels of abstraction are:
 - **Level 0**: `Hardware` *(given for this project)*
