@@ -32,6 +32,12 @@ void exceptionHandler() {
   unsigned exception_code = cause & 0x7FFFFFFF; // 0111 1111 ...  (32 bit)
 
   unsigned is_interrupt_enabled = BIT_CHECKER(status, 7);
+  /**
+   * 31          30                                        0
+   * +-----------+-----------------------------------------+
+   * | interrupt |            exception code               |
+   * +-----------+-----------------------------------------+
+   */
   unsigned is_interrupt = BIT_CHECKER(cause, 31);
 
   state_t *exception_state = (state_t *)BIOSDATAPAGE;
