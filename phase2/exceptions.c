@@ -14,9 +14,8 @@ void uTLB_RefillHandler() {
   if (current_process->p_supportStruct == NULL)
     PANIC();
     
-  // i'm missing page p of the current-process support struct tlb
-  pteEntry_t *missing_page =
-      &current_process->p_supportStruct->sup_privatePgTbl[p];
+  // missing page (p) of the current-process support struct tlb
+  pteEntry_t *missing_page = &current_process->p_supportStruct->sup_privatePgTbl[p];
   setENTRYHI(missing_page->pte_entryHI);
   setENTRYLO(missing_page->pte_entryLO);
   TLBWR();
@@ -30,7 +29,7 @@ void exceptionHandler() {
   // error code from .ExcCode field of the Cause register
   unsigned status = getSTATUS();
   unsigned cause = getCAUSE();
-  unsigned exception_code = cause & 0x7FFFFFFF; // 0311 1111 x 32
+  unsigned exception_code = cause & 0x7FFFFFFF; // 0111 1111 ...  (32 bit)
 
   unsigned is_interrupt_enabled = BIT_CHECKER(status, 7);
   unsigned is_interrupt = BIT_CHECKER(cause, 31);
