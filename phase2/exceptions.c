@@ -215,15 +215,15 @@ void passUpOrDie(unsigned type, state_t *exec_state) {
     Scheduler();
     return;
   }
+
   // 1st Save the processor state
-  copyState(exec_state,
-            &current_process->p_supportStruct->sup_exceptState[type]);
+  copyState(exec_state, &current_process->p_supportStruct->sup_exceptState[type]);
+
   // 2nd Update the accumulated CPU time for the Current Process
   current_process->p_time -= deltaInterruptTime();
   current_process->p_time += deltaTime();
 
   // 3rd Pass up the exception
-  context_t context_pass_to =
-      current_process->p_supportStruct->sup_exceptContext[type];
+  context_t context_pass_to = current_process->p_supportStruct->sup_exceptContext[type];
   LDCXT(context_pass_to.stackPtr, context_pass_to.status, context_pass_to.pc);
 }

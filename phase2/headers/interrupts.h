@@ -8,7 +8,7 @@ them into appropriate messages for blocked PCBs.*/
 
 // time interrupt started
 extern cpu_t time_interrupt_start;
-
+// accumulated time during interrupt
 cpu_t deltaInterruptTime(void);
 void interruptHandler(void);
 void interruptHandlerNonTimer(unsigned);
