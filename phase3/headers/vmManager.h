@@ -1,4 +1,6 @@
+/* Virtual memory management system */
 #ifndef VM_MANAGER_H
+#define VM_MANAGER_H
 
 #include "sysSupport.h"
 
@@ -8,30 +10,22 @@ extern swap_t swap_pool[2 * UPROCMAX];
 
 // internal phase2 global variables & functions
 extern pcb_PTR ssi_pcb;
-extern void TrapExceptionHandler(state_t *);
+extern void TrapExceptionHandler(state_t *exception_state);
 
 void initSwapPool(void);
-
 // retrun true if the frame is free
 unsigned isSwapPoolFrameFree(unsigned);
-
-// support level TLB handler
-void sTLB_RefillHandler(void);
-
 // support level PGM handler
 void pager(void);
-
 // entry point function for mutex swap process
-void entrySwapFunction();
-
+void entrySwapFunction(void);
 // get frame from swap pool
-unsigned getFrameFromSwapPool();
-
-// flash operation
+unsigned getFrameFromSwapPool(void);
+// flash drive operations
 unsigned flashOperation(unsigned command, unsigned page_addr, unsigned asid, unsigned page_number);
-
+// read from backing store (flash device)
 unsigned readBackingStoreFromPage(memaddr missing_page_addr, unsigned asid, unsigned page_number);
-
+// write to backing store (flash device)
 unsigned writeBackingStore(memaddr updating_page_addr, unsigned asid, unsigned page_no);
 
 #endif

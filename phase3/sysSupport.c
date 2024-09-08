@@ -68,9 +68,7 @@ void UsysCallHandler(state_t *exception_state, int asid) {
      * parent.
      */
 
-    dest_process =
-        a1_reg == PARENT ? sst_pcb[asid-1] : (pcb_t *)a1_reg;
-    
+    dest_process = a1_reg == PARENT ? sst_pcb[asid-1] : (pcb_t *)a1_reg;
     SYSCALL(SENDMESSAGE, (unsigned)dest_process, a2_reg, 0);           
 
     break;

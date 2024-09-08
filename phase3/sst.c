@@ -16,7 +16,6 @@ void initSSTs() {
     sst_st[i].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M | MSTATUS_MIE_MASK;
     sst_st[i].mie = MIE_ALL;
     sst_pcb[i] = createChild(&sst_st[i], &support_arr[i]);
-    // init the uProc (sst child)
   }
 }
 
@@ -25,17 +24,15 @@ void sstEntry() {
   support_t *sst_support = getSupportData();
   state_t *u_proc_prole = &u_proc_state[sst_support->sup_asid - 1];
 
+  // init the uProc (sst child)
   child_pcb[sst_support->sup_asid - 1] = initUProc(u_proc_prole, sst_support);
   // get the message from someone - user process
   // handle
   // reply
   while (TRUE) {
     ssi_payload_PTR process_request_payload;
-    pcb_PTR process_request_ptr = (pcb_PTR)SYSCALL(
-        RECEIVEMESSAGE, ANYMESSAGE, (unsigned)(&process_request_payload), 0);
-    sstRequestHandler(process_request_ptr,
-                      process_request_payload->service_code,
-                      process_request_payload->arg);
+    pcb_PTR process_request_ptr = (pcb_PTR)SYSCALL(RECEIVEMESSAGE, ANYMESSAGE, (unsigned)(&process_request_payload), 0);
+    sstRequestHandler(process_request_ptr, process_request_payload->service_code, process_request_payload->arg);
   }
 }
 
@@ -104,20 +101,17 @@ void killSST(int asid) {
   terminateProcess(SELF);
 }
 
-void writeOnPrinter(sst_print_PTR arg, unsigned asid) {
+void writeOnPrinter(sst_print_PTR arg, unsigned int asid) {
   // write the string on the printer
-  write(arg->string, arg->length,
-        (devreg_t *)DEV_REG_ADDR(IL_PRINTER, asid - 1), PRINTER, asid);
+  write(arg->string, arg->length, (devreg_t *)DEV_REG_ADDR(IL_PRINTER, asid - 1), PRINTER, asid);
 }
 
 void writeOnTerminal(sst_print_PTR arg, unsigned int asid) {
   // write the string on t RECEIVEMSG, he printer
-  write(arg->string, arg->length,
-        (devreg_t *)DEV_REG_ADDR(IL_TERMINAL, asid - 1), TERMINAL, asid);
+  write(arg->string, arg->length, (devreg_t *)DEV_REG_ADDR(IL_TERMINAL, asid - 1), TERMINAL, asid);
 }
 
-void write(char *msg, int lenght, devreg_t *devAddrBase, enum writet write_to,
-           int asid) {
+void write(char *msg, int lenght, devreg_t *devAddrBase, enum writet write_to, int asid) {
   int i = 0;
   unsigned status;
   // check if it's a terminal or a printer
@@ -139,12 +133,12 @@ void write(char *msg, int lenght, devreg_t *devAddrBase, enum writet write_to,
     }
 
     ssi_do_io_t do_io = {
-        .commandAddr = command,
-        .commandValue = value,
+      .commandAddr = command,
+      .commandValue = value,
     };
     ssi_payload_t payload = {
-        .service_code = DOIO,
-        .arg = &do_io,
+      .service_code = DOIO,
+      .arg = &do_io,
     };
 
     SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&payload), 0);
@@ -152,11 +146,9 @@ void write(char *msg, int lenght, devreg_t *devAddrBase, enum writet write_to,
 
     // device not ready -> error!
     if (write_to == TERMINAL && status != OKCHARTRANS) {
-      programTrapExceptionHandler(
-          &(sst_pcb[asid]->p_supportStruct->sup_exceptState[GENERALEXCEPT]));
+      programTrapExceptionHandler(&(sst_pcb[asid]->p_supportStruct->sup_exceptState[GENERALEXCEPT]));
     } else if (write_to == PRINTER && status != DEVRDY) {
-      programTrapExceptionHandler(
-          &(sst_pcb[asid]->p_supportStruct->sup_exceptState[GENERALEXCEPT]));
+      programTrapExceptionHandler(&(sst_pcb[asid]->p_supportStruct->sup_exceptState[GENERALEXCEPT]));
     }
 
     msg++;

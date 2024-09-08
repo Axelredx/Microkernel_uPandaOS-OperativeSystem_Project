@@ -4,13 +4,25 @@ extern memaddr current_stack_top;
 
 // init and fill the support page table with the correct values
 void initUprocPageTable(pteEntry_t *tbl, int asid) {
+  /**
+   * To initialize a Page Table one needs to set the VPN, ASID, V, and D bit fields for each Page Table
+   * entry [Section 6.3.2-pops].
+   * •The VPN field will be set to [0x80000..0x8001E] for the first 31 entries. The VPN for the stack
+   *  page (Page Table entry 31) should be set to 0xBFFFF - the starting address whose top end is
+   *  0xC000.0000 (the value that SP is initialized to).
+   * •The ASID field, for any given Page Table, will all be set to the U-proc’s unique ID, an integer
+   *  from [1..8].
+   * •The D bit field will be set to 1 (on) - each page is write-enabled.
+   * •The G bit field will be set to 1 (off) - these pages are private to the specific ASID.
+   * •The V bit field will be set to 0 (off) - the entry is NOT valid. For example, a copy of this page
+   *  is not also currently residing in RAM.
+   */
+
   for (int i = 0; i < MAXPAGES; i++) {
-    tbl[i].pte_entryHI =
-        KUSEG | (i << VPNSHIFT) | (asid << ASIDSHIFT);
+    tbl[i].pte_entryHI = KUSEG | (i << VPNSHIFT) | (asid << ASIDSHIFT);
     tbl[i].pte_entryLO = DIRTYON;
   }
-  tbl[31].pte_entryHI =
-      (0xbffff << VPNSHIFT) | (asid << ASIDSHIFT);
+  tbl[31].pte_entryHI = (0xbffff << VPNSHIFT) | (asid << ASIDSHIFT);
 }
 
 void initFreeStackTop(void){
@@ -19,7 +31,7 @@ void initFreeStackTop(void){
 }
 
 void defaultSupportData(support_t *support_data, int asid){
-  /*
+  /** 
    * Only the sup_asid, sup_exceptContext[2], and sup_privatePgTbl[32] [Section 2.1] require
    * initialization prior to request the CreateProcess service.
    * To initialize a processor context area one performs the following:
@@ -31,7 +43,7 @@ void defaultSupportData(support_t *support_data, int asid){
    *   • Set the two SP fields to utilize the two stack spaces allocated in the Support Structure. Stacks
    *      grow “down” so set the SP fields to the address of the end of these areas.
    *      E.g. ... = &(...sup_stackGen[499]).
-  */
+   */
   support_data->sup_asid = asid;
 
 
@@ -81,8 +93,8 @@ pcb_PTR initUProc(state_t *u_proc_state, support_t *sst_support){
 support_t *getSupportData(void) {
   support_t *support_data;
   ssi_payload_t getsup_payload = {
-      .service_code = GETSUPPORTPTR,
-      .arg = NULL,
+    .service_code = GETSUPPORTPTR,
+    .arg = NULL,
   };
   SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&getsup_payload),0);
   SYSCALL(RECEIVEMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&support_data), 0);
@@ -91,18 +103,18 @@ support_t *getSupportData(void) {
 
 /*function to request creation of a child to SSI*/
 pcb_t *createChild(state_t *s, support_t *sup) {
-    pcb_t *p;
-    ssi_create_process_t ssi_create_process = {
-        .state = s,
-        .support = sup,
-    };
-    ssi_payload_t payload = {
-        .service_code = CREATEPROCESS,
-        .arg = &ssi_create_process,
-    };
-    SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)&payload, 0);
-    SYSCALL(RECEIVEMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&p), 0);
-    return p;
+  pcb_t *p;
+  ssi_create_process_t ssi_create_process = {
+    .state = s,
+    .support = sup,
+  };
+  ssi_payload_t payload = {
+    .service_code = CREATEPROCESS,
+    .arg = &ssi_create_process,
+  };
+  SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)&payload, 0);
+  SYSCALL(RECEIVEMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&p), 0);
+  return p;
 }
 
 // gain mutual exclusion over the swap pool
@@ -122,12 +134,12 @@ int isOneOfSSTPids(int pid){
 }
 
 void terminateProcess(pcb_PTR arg){
-    ssi_payload_t term_process_payload = {
-        .service_code = TERMPROCESS,
-        .arg = (void *)arg,
-    };
-    SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&term_process_payload), 0);
-    SYSCALL(RECEIVEMESSAGE, (unsigned int)ssi_pcb, 0, 0);
+  ssi_payload_t term_process_payload = {
+    .service_code = TERMPROCESS,
+    .arg = (void *)arg,
+  };
+  SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&term_process_payload), 0);
+  SYSCALL(RECEIVEMESSAGE, (unsigned int)ssi_pcb, 0, 0);
 }
 
 void notify(pcb_PTR process){

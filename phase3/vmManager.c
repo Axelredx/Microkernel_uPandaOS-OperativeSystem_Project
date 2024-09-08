@@ -36,7 +36,10 @@ swap_t swap_pool[POOLSIZE];
  */
 
 void initSwapPool(void) {
-  // initialize the swap pool
+  /**
+   * Technical Point: Since all valid ASID values are positive numbers, one can indicate that a frame
+   * is unoccupied with an entry of -1 in that frame’s ASID entry in the Swap Pool table.
+   */
   for (int i = 0; i < POOLSIZE; i++) {
     swap_pool[i].sw_asid = NOPROC;
   }
@@ -81,9 +84,12 @@ void pager(void) {
     programTrapExceptionHandler(exception_state);
   }
 
+  /**
+   * ##################################
+   * |   enter the critical section   |
+   * ##################################
+   */ 
   gainSwapMutex();
-
-  /* enter the critical section */
 
   // it's not the actual vpn, but the page index in the backing store
   int vpn = ENTRYHI_GET_VPN(exception_state->entry_hi);
@@ -97,9 +103,15 @@ void pager(void) {
 
   // check if the frame is occupied
   if (isSwapPoolFrameFree(victim_frame) == FALSE) {
-    // we assume the frame is occupied by a dirty page
-
-    // operations performed atomically
+    /**
+     *  we assume the frame is occupied by a dirty page
+     */
+  
+    /** 
+     * /----------------------------------\
+     * | startregion of atomic operations |
+     * \----------------------------------/
+     */
     OFFINTERRUPTS();
 
     // mark the page pointed by the swap pool as not valid
@@ -109,8 +121,13 @@ void pager(void) {
     updateTLB(swap_pool[victim_frame].sw_pte);
 
     ONINTERRUPTS();
+    /** 
+     * /----------------------------------\
+     * |  endregion of atomic operations  |
+     * \----------------------------------/
+     */
 
-    // update the backing store
+    // update the backing store (flash device)
     status = writeBackingStore(victim_page_addr, swap_pool[victim_frame].sw_asid,
                                swap_pool[victim_frame].sw_pageNo);
     if (status != DEVRDY) {
@@ -119,7 +136,7 @@ void pager(void) {
 
   }
 
-  // read the contents of the current process's backing store
+  // read the contents of the current process's backing store (flash device)
   status = readBackingStoreFromPage(victim_page_addr, support_data->sup_asid, vpn);
 
   if (status != DEVRDY) // operation failed
@@ -132,7 +149,12 @@ void pager(void) {
   swap_pool[victim_frame].sw_pageNo = vpn;
   swap_pool[victim_frame].sw_pte = &support_data->sup_privatePgTbl[vpn];
 
-  // #region atomic operations
+  /** 
+   * /----------------------------------\
+   * | startregion of atomic operations |
+   * \----------------------------------/
+   */
+
   OFFINTERRUPTS();
 
   // update the current process's page table
@@ -146,10 +168,18 @@ void pager(void) {
   updateTLB(&support_data->sup_privatePgTbl[vpn]);
 
   ONINTERRUPTS();
-  // #endregion atomic operations
+  /** 
+   * /----------------------------------\
+   * |  endregion of atomic operations  |
+   * \----------------------------------/
+   */
 
   releaseSwapMutex();
-  /* exit the critical section */
+  /**
+   * ##################################
+   * |    exit the critical section   |
+   * ##################################
+   */
 
   // return control to the current process
   LDST(exception_state);
@@ -194,6 +224,6 @@ unsigned getFrameFromSwapPool() {
       break;
     }
   }
-  // otherwise implement the page replacement algorithm RR
+  // otherwise implement the page replacement algorithm FIFO -> 'RR'
   return frame++ % POOLSIZE;
 }
