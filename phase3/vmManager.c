@@ -3,7 +3,8 @@
 pcb_PTR swap_mutex;
 pcb_PTR gained_mutex_process; // debug purpose
 
-// swap pool
+/* Swap Pool (allows the system to extend its virtual memory beyond the physical RAM
+by using the disk as a temporary holding place for data.)*/
 swap_t swap_pool[POOLSIZE];
 
 /**
