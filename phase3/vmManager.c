@@ -6,6 +6,35 @@ pcb_PTR gained_mutex_process; // debug purpose
 // swap pool
 swap_t swap_pool[POOLSIZE];
 
+/**
+ *                    Entry High               |                  Entry Low          
+ * +---------------------+---------------------+---------------------+---------------------+
+ * |         VPN         |         ASID        |         PFN         |  N  |  D  | V |  G  |
+ * +---------------------+---------------------+---------------------+---------------------+
+ * 
+ * VPN: Virtual Page Number. This is simply the higher order 20-bits of
+ *      a logical address. The lower order 12-bits of the address are the offset into
+ *      a 4 KB (212) page.
+ * ASID: Address Space Identifier, a.k.a. process ID for this VPN.
+ * PFN: Physical Frame Number, where the VPN for the specified ASID
+ *      can be found in RAM.
+ * N: Non-cacheable bit: Not used in μMPS3.
+ * D: Dirty bit, This bit is used to implement memory protection mechanisms.
+ *    When set to zero (off) a write access to a location in the physical frame will
+ *    cause a TLB-Modification exception to be raised. This “write protection”
+ *    bit allows for the realization of memory protection schemes and/or sophis-
+ *    ticated page replacement algorithms.
+ * V: Valid bit, If set to 1 (on), this TLB entry is considered valid. A valid
+ *    entry is one where the PFN actually holds the ASID/virtual page number
+ *    pairing. If 0 (off), the indicated ASID/virtual page number pairing is not
+ *    actually in the PFN and any access to this page will cause a TLB-Invalid
+ *    exception to be raised. In practical terms, a TLB-Invalid exception is what
+ *    is generically called a “page fault.”
+ * G: Global bit, If set to 1 (on), the TLB entry will match any ASID with the
+ *    corresponding VPN. This bit allows for memory sharing schemes.
+ * 
+ */
+
 void initSwapPool(void) {
   // initialize the swap pool
   for (int i = 0; i < POOLSIZE; i++) {
@@ -91,8 +120,7 @@ void pager(void) {
   }
 
   // read the contents of the current process's backing store
-  status =
-      readBackingStoreFromPage(victim_page_addr, support_data->sup_asid, vpn);
+  status = readBackingStoreFromPage(victim_page_addr, support_data->sup_asid, vpn);
 
   if (status != DEVRDY) // operation failed
   {
