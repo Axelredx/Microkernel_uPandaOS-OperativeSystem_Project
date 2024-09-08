@@ -224,6 +224,6 @@ unsigned getFrameFromSwapPool() {
       break;
     }
   }
-  // otherwise implement the page replacement algorithm FIFO -> 'RR'
+  // otherwise increase counter of the page replacement algorithm (FIFO)
   return frame++ % POOLSIZE;
 }
