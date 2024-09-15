@@ -32,7 +32,7 @@ void SSI_function_entry_point() {
   while (TRUE) {
     ssi_payload_PTR process_request_payload;
     pcb_PTR process_request_ptr = (pcb_PTR) SYSCALL(RECEIVEMESSAGE, ANYMESSAGE, (unsigned)(&process_request_payload), 0);
-    // satysfy request and send back resoults(with a SYSYCALL in SSIRequest)
+    // satysfy request and send back resoults(with a SYSYCALL (in SSIRequest)
     SSI_Request(process_request_ptr, process_request_payload->service_code,process_request_payload->arg);
   }
 }
@@ -106,7 +106,6 @@ pcb_PTR Create_Process(pcb_t *sender, struct ssi_create_process_t *arg) {
   insertProcQ(&ready_queue_list, new_prole);
   insertChild(sender, new_prole);
   return new_prole;
-  
 }
 
 unsigned Terminate_Process(pcb_t *sender, pcb_t *target) {

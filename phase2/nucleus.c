@@ -84,7 +84,7 @@ void initKernel() {
    * |       ///          | MPP |  //  | MPIE | / | MIE |  /  |
    * +--------------------+-----+------+------+---+-----+-----+
    */
-  second_process->p_s.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M | MSTATUS_MIE_MASK; 
+  second_process->p_s.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M | MSTATUS_MIE_MASK;
   second_process->p_s.mie = MIE_ALL;
 
   process_count++;

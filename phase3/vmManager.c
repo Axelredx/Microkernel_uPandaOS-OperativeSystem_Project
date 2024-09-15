@@ -1,13 +1,15 @@
 #include "./headers/vmManager.h"
 
 pcb_PTR swap_mutex;
-pcb_PTR gained_mutex_process; // debug purpose
+int gained_mutex_asid = NOPROC; // debug purpose
 
 /* Swap Pool (allows the system to extend its virtual memory beyond the physical RAM
 by using the disk as a temporary holding place for data.)*/
 swap_t swap_pool[POOLSIZE];
 
 /**
+ * From the μMPS3 documentation:
+ * 
  *                    Entry High               |                  Entry Low          
  * +---------------------+---------------------+---------------------+---------------------+
  * |         VPN         |         ASID        |         PFN         |  N  |  D  | V |  G  |
@@ -58,7 +60,9 @@ void entrySwapFunction() {
     // wait for a swap request
     unsigned int process_requesting_swap = SYSCALL(RECEIVEMESSAGE, ANYMESSAGE, 0, 0);
 
-    gained_mutex_process = (pcb_PTR)process_requesting_swap;
+    pcb_PTR process = (pcb_PTR)process_requesting_swap;
+
+    gained_mutex_asid = process->p_supportStruct->sup_asid;
 
     // giving the process the swap mutex
     SYSCALL(SENDMESSAGE, (unsigned int)process_requesting_swap, 0, 0);
@@ -66,7 +70,7 @@ void entrySwapFunction() {
     SYSCALL(RECEIVEMESSAGE, (unsigned int)process_requesting_swap, 0, 0);
     
     // released the swap mutex
-    gained_mutex_process = NULL;
+    gained_mutex_asid = NOPROC;
   }
 }
 
@@ -74,15 +78,13 @@ void pager(void) {
   unsigned status;
   // get the support data of the current process
   support_t *support_data = getSupportData();
-
   state_t *exception_state = &(support_data->sup_exceptState[PGFAULTEXCEPT]);
-
   unsigned cause = exception_state->cause & 0x7FFFFFFF;
 
   // check if the exception is a TLB-Modification exception
   if (cause == TLBMOD) {
     // treat this exception as a program trap
-    programTrapExceptionHandler(exception_state);
+    programTrapExceptionHandler(support_data);
   }
 
   /**
@@ -116,7 +118,7 @@ void pager(void) {
     OFFINTERRUPTS();
 
     // mark the page pointed by the swap pool as not valid
-    swap_pool[victim_frame].sw_pte->pte_entryLO &= ~VALIDON;
+    swap_pool[victim_frame].sw_pte->pte_entryLO &= !VALIDON;
 
     // update the TLB if needed
     updateTLB(swap_pool[victim_frame].sw_pte);
@@ -128,21 +130,21 @@ void pager(void) {
      * \----------------------------------/
      */
 
-    // update the backing store (flash device)
-    status = writeBackingStore(victim_page_addr, swap_pool[victim_frame].sw_asid,
-                               swap_pool[victim_frame].sw_pageNo);
+    // update the backing store
+    status = writeBackingStore(victim_page_addr, swap_pool[victim_frame].sw_asid, swap_pool[victim_frame].sw_pageNo);
     if (status != DEVRDY) {
-      programTrapExceptionHandler(exception_state);
+      programTrapExceptionHandler(support_data);
     }
 
   }
 
-  // read the contents of the current process's backing store (flash device)
-  status = readBackingStoreFromPage(victim_page_addr, support_data->sup_asid, vpn);
+  // read the contents of the current process's backing store
+  status =
+      readBackingStoreFromPage(victim_page_addr, support_data->sup_asid, vpn);
 
-  if (status != DEVRDY) // operation failed
+  if (status != DEVRDY)
   {
-    programTrapExceptionHandler(exception_state);
+    programTrapExceptionHandler(support_data);
   }
 
   // update the swap pool table
@@ -186,45 +188,41 @@ void pager(void) {
   LDST(exception_state);
 }
 
-unsigned flashOperation(unsigned command, unsigned page_addr, unsigned asid,
-                        unsigned page_number) {
+unsigned flashOperation(unsigned command, unsigned page_addr, unsigned asid, unsigned page_number) {
   dtpreg_t *flash_dev_addr = (dtpreg_t *)DEV_REG_ADDR(IL_FLASH, asid - 1);
   flash_dev_addr->data0 = page_addr;
 
   unsigned value = (page_number << 8) | command;
   unsigned status = 0;
   ssi_do_io_t do_io = {
-      .commandAddr = &(flash_dev_addr->command),
-      .commandValue = value,
+    .commandAddr = &(flash_dev_addr->command),
+    .commandValue = value,
   };
   ssi_payload_t payload = {
-      .service_code = DOIO,
-      .arg = &do_io,
+    .service_code = DOIO,
+    .arg = &do_io,
   };
   SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&payload), 0);
   SYSCALL(RECEIVEMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&status), 0);
   return status;
 }
 
-unsigned readBackingStoreFromPage(memaddr missing_page_addr, unsigned asid,
-                                  unsigned page_number) {
+unsigned readBackingStoreFromPage(memaddr missing_page_addr, unsigned asid, unsigned page_number) {
   return flashOperation(FLASHREAD, missing_page_addr, asid, page_number);
 }
 
-unsigned writeBackingStore(memaddr updating_page_addr, unsigned asid,
-                           unsigned page_number) {
+unsigned writeBackingStore(memaddr updating_page_addr, unsigned asid, unsigned page_number) {
   return flashOperation(FLASHWRITE, updating_page_addr, asid, page_number);
 }
 
 unsigned getFrameFromSwapPool() {
+  // implement the page replacement algorithm FIFO
   static unsigned frame = 0;
-  // find a free frame in the swap pool
   for (unsigned i = 0; i < POOLSIZE; i++) {
     if (isSwapPoolFrameFree(i)) {
       frame = i;
       break;
     }
   }
-  // otherwise increase counter of the page replacement algorithm (FIFO)
   return frame++ % POOLSIZE;
 }

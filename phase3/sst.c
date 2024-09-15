@@ -1,4 +1,5 @@
 #include "./headers/sst.h"
+#include "headers/stdlib.h"
 
 pcb_PTR sst_pcb[MAXSSTNUM];
 pcb_PTR child_pcb[MAXSSTNUM]; // debug purpose
@@ -6,37 +7,45 @@ memaddr current_stack_top;
 state_t sst_st[MAXSSTNUM];
 state_t u_proc_state[MAXSSTNUM];
 
+
+state_t print_state[MAXSSTNUM];
+state_t term_state[MAXSSTNUM];
+
+pcb_PTR print_pcb[MAXSSTNUM];
+pcb_PTR term_pcb[MAXSSTNUM];
+
 void initSSTs() {
   // init of the 8 sst process
   for (int i = 0; i < MAXSSTNUM; i++) {
-    STST(&sst_st[i]);
-    sst_st[i].entry_hi = (i + 1) << ASIDSHIFT;
-    sst_st[i].reg_sp = getCurrentFreeStackTop();
-    sst_st[i].pc_epc = (memaddr)sstEntry;
-    sst_st[i].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M | MSTATUS_MIE_MASK;
-    sst_st[i].mie = MIE_ALL;
-    sst_pcb[i] = createChild(&sst_st[i], &support_arr[i]);
+    sst_pcb[i] = initHelper(&sst_st[i], allocateSupport(), sstEntry);
   }
 }
 
 void sstEntry() {
   // init the child
   support_t *sst_support = getSupportData();
-  state_t *u_proc_prole = &u_proc_state[sst_support->sup_asid - 1];
+  child_pcb[sst_support->sup_asid - 1] = initUProc(&u_proc_state[sst_support->sup_asid - 1], sst_support);
 
-  // init the uProc (sst child)
-  child_pcb[sst_support->sup_asid - 1] = initUProc(u_proc_prole, sst_support);
+  // init the print process
+  print_pcb[sst_support->sup_asid - 1] = initPrintProcess(&print_state[sst_support->sup_asid - 1], sst_support);
+
+  // init the term process
+  term_pcb[sst_support->sup_asid - 1] = initTermProcess(&term_state[sst_support->sup_asid - 1], sst_support);
+
   // get the message from someone - user process
   // handle
   // reply
   while (TRUE) {
     ssi_payload_PTR process_request_payload;
     pcb_PTR process_request_ptr = (pcb_PTR)SYSCALL(RECEIVEMESSAGE, ANYMESSAGE, (unsigned)(&process_request_payload), 0);
-    sstRequestHandler(process_request_ptr, process_request_payload->service_code, process_request_payload->arg);
+    sstRequestHandler(process_request_ptr, process_request_payload->service_code, 
+                      process_request_payload->arg,
+                      print_pcb[sst_support->sup_asid - 1],
+                      term_pcb[sst_support->sup_asid - 1]);
   }
 }
 
-void sstRequestHandler(pcb_PTR sender, int service, void *arg) {
+void sstRequestHandler(pcb_PTR sender, int service, void *arg, pcb_PTR print_process, pcb_PTR term_process) {
   void *res_payload = NULL;
   unsigned has_to_reply = FALSE;
   switch (service) {
@@ -55,14 +64,14 @@ void sstRequestHandler(pcb_PTR sender, int service, void *arg) {
      * Remember to send a message to the test process to
      * communicate the termination of the SST.
      */
-    killSST(sender->p_supportStruct->sup_asid);
+    killSST(sender->p_supportStruct);
     break;
   case WRITEPRINTER:
     /* This service cause the print of a string of characters
      * to the printer with the same number of the sender
      * ASID.
      */
-    writeOnPrinter((sst_print_PTR)arg, sender->p_supportStruct->sup_asid);
+    print((sst_print_PTR)arg, print_process);
     has_to_reply = TRUE;
     break;
   case WRITETERMINAL:
@@ -70,11 +79,11 @@ void sstRequestHandler(pcb_PTR sender, int service, void *arg) {
      * to the terminal with the same number of the sender
      * ASID.
      */
-    writeOnTerminal((sst_print_PTR)arg, sender->p_supportStruct->sup_asid);
+    print((sst_print_PTR)arg, term_process);
     has_to_reply = TRUE;
     break;
   default:
-    // error
+    // error!
     terminateProcess(SELF); // terminate the SST and child
     break;
   }
@@ -85,73 +94,33 @@ void sstRequestHandler(pcb_PTR sender, int service, void *arg) {
   }
 }
 
+void print(sst_print_PTR arg, pcb_PTR print_process) {
+  // unwrap the arg and send it to the print process
+  int length = arg->length;
+  char string[length];
+  for (int i = 0; i < length; i++) {
+    string[i] = arg->string[i];
+  }
+  sst_print_t printing = {
+    .string = string,
+    .length = length,
+  };
+  SYSCALL(SENDMESSAGE, (unsigned int)print_process, (unsigned int)&printing, 0);
+  SYSCALL(RECEIVEMESSAGE, (unsigned)print_process, 0, 0);
+}
+
 cpu_t getTOD() {
   cpu_t tod_time;
   STCK(tod_time);
   return tod_time;
 }
 
-void killSST(int asid) {
+void killSST(support_t *sst_support) {
   notify(test_process);
 
-  // invalidate the page table
-  invalidateUProcPageTable(sst_pcb[asid]->p_supportStruct);
+  // deallocate the support struct
+  deallocateSupport(sst_support);
 
   // kill the sst and its child
   terminateProcess(SELF);
-}
-
-void writeOnPrinter(sst_print_PTR arg, unsigned int asid) {
-  // write the string on the printer
-  write(arg->string, arg->length, (devreg_t *)DEV_REG_ADDR(IL_PRINTER, asid - 1), PRINTER, asid);
-}
-
-void writeOnTerminal(sst_print_PTR arg, unsigned int asid) {
-  // write the string on t RECEIVEMSG, he printer
-  write(arg->string, arg->length, (devreg_t *)DEV_REG_ADDR(IL_TERMINAL, asid - 1), TERMINAL, asid);
-}
-
-void write(char *msg, int lenght, devreg_t *devAddrBase, enum writet write_to, int asid) {
-  int i = 0;
-  unsigned status;
-  // check if it's a terminal or a printer
-  unsigned *command = write_to == TERMINAL ? &(devAddrBase->term.transm_command)
-                                           : &(devAddrBase->dtp.command);
-
-  while (TRUE) {
-    if ((*msg == EOS) || (i >= lenght)) {
-      break;
-    }
-
-    unsigned int value;
-
-    if (write_to == TERMINAL) {
-      value = PRINTCHR | (((unsigned int)*msg) << 8);
-    } else {
-      value = PRINTCHR;
-      devAddrBase->dtp.data0 = *msg;
-    }
-
-    ssi_do_io_t do_io = {
-      .commandAddr = command,
-      .commandValue = value,
-    };
-    ssi_payload_t payload = {
-      .service_code = DOIO,
-      .arg = &do_io,
-    };
-
-    SYSCALL(SENDMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&payload), 0);
-    SYSCALL(RECEIVEMESSAGE, (unsigned int)ssi_pcb, (unsigned int)(&status), 0);
-
-    // device not ready -> error!
-    if (write_to == TERMINAL && status != OKCHARTRANS) {
-      programTrapExceptionHandler(&(sst_pcb[asid]->p_supportStruct->sup_exceptState[GENERALEXCEPT]));
-    } else if (write_to == PRINTER && status != DEVRDY) {
-      programTrapExceptionHandler(&(sst_pcb[asid]->p_supportStruct->sup_exceptState[GENERALEXCEPT]));
-    }
-
-    msg++;
-    i++;
-  }
 }

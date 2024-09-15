@@ -33,7 +33,6 @@ void Scheduler() {
         // wait for an interrupt
         WAIT();
       } else if(process_count > 0 && soft_block_count == 0) { 
-        // deadlock!
         PANIC();
       }
 
