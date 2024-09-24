@@ -135,15 +135,12 @@ void pager(void) {
     if (status != DEVRDY) {
       programTrapExceptionHandler(support_data);
     }
-
   }
 
   // read the contents of the current process's backing store
-  status =
-      readBackingStoreFromPage(victim_page_addr, support_data->sup_asid, vpn);
+  status = readBackingStoreFromPage(victim_page_addr, support_data->sup_asid, vpn);
 
-  if (status != DEVRDY)
-  {
+  if (status != DEVRDY){
     programTrapExceptionHandler(support_data);
   }
 
