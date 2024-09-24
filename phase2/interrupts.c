@@ -78,35 +78,28 @@ void interruptHandlerNonTimer(unsigned ip_line) {
 
   // diffrent device interrupts
   switch (ip_line) {
-  case IL_TERMINAL:
-    termreg_t *term = (termreg_t *)dev_addr_base;
-
-
     // 2. Save off the status code from the device’s device register
     // 3. Acknowledge the outstanding interrupt
-    if ((term->transm_status & STATMASK) == OKCHARTRANS) {
-      status = term->transm_status & STATMASK;
-      term->transm_command = ACK;
-    } else {
-      status = term->recv_status & STATMASK;
-      term->recv_command = ACK;
-    }
-
     // 4. Send a message and unblock the PCB waiting the status
-    dev_index = DEVINDEX(ip_line, dev_no);
-
-    break;
-
-  case IL_FLASH:
-  default:
-    dtpreg_t *flash = (dtpreg_t *)dev_addr_base;
-
-    status = flash->status;
-
-    flash->command = ACK;
-    
-    dev_index = DEVINDEX(ip_line, dev_no);
-    break;
+    case IL_TERMINAL:
+      termreg_t *term = (termreg_t *)dev_addr_base;
+      if ((term->transm_status & STATMASK) == OKCHARTRANS) {
+        status = term->transm_status & STATMASK;
+        term->transm_command = ACK;
+      } else {
+        status = term->recv_status & STATMASK;
+        term->recv_command = ACK;
+      }
+      dev_index = DEVINDEX(ip_line, dev_no);
+      break;
+      
+    case IL_FLASH:
+    default:
+      dtpreg_t *flash = (dtpreg_t *)dev_addr_base;
+      status = flash->status;
+      flash->command = ACK;
+      dev_index = DEVINDEX(ip_line, dev_no);
+      break;
   }
 
   pcb_PTR caller = removeProcQ(&blockedPCBs[dev_index]);
