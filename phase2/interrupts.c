@@ -84,11 +84,11 @@ void interruptHandlerNonTimer(unsigned ip_line) {
 
     // 2. Save off the status code from the device’s device register
     // 3. Acknowledge the outstanding interrupt
-    if ((term->transm_status & 0xff) == OKCHARTRANS) {
-      status = term->transm_status & 0xff;
+    if ((term->transm_status & STATMASK) == OKCHARTRANS) {
+      status = term->transm_status & STATMASK;
       term->transm_command = ACK;
     } else {
-      status = term->recv_status;
+      status = term->recv_status & STATMASK;
       term->recv_command = ACK;
     }
 

@@ -26,7 +26,7 @@ pcb_t *headProcQ(struct list_head *head);
 by head. Return NULL if the process queue was initially empty; otherwise return the pointer
 to the removed element.*/
 pcb_t *removeProcQ(struct list_head *head);
-/*Remove the PCB pointed to by p from the process queue whose head pointer is pointed to by
+/*Remove the PCB pointed by p from the process queue whose head pointer is pointed by
 head. If the desired entry is not in the indicated queue (an error condition), return NULL;
 otherwise, return p.*/
 pcb_t *outProcQ(struct list_head *head, pcb_t *p);
